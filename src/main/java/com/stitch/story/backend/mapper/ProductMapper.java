@@ -19,6 +19,7 @@ public class ProductMapper {
                 .stock(product.getStock())
                 .category(product.getCategory())
                 .sizes(product.getSizes() != null ? product.getSizes() : List.of())
+                .customizable(product.isCustomizable())
                 .build();
     }
 
@@ -41,6 +42,7 @@ public class ProductMapper {
                 .stock(productDTO.getStock())
                 .category(productDTO.getCategory())
                 .sizes(productDTO.getSizes() != null ? new ArrayList<>(productDTO.getSizes()) : new ArrayList<>())
+                .customizable(productDTO.isCustomizable())
                 .build();
     }
 }

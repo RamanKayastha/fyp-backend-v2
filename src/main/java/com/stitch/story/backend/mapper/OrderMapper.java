@@ -63,6 +63,9 @@ public class OrderMapper {
                 .size(item.getSize())
                 .quantity(item.getQuantity())
                 .price(item.getPrice())
+                .customized(item.isCustomized())
+                .previewFront(item.getPreviewFront())
+                .previewBack(item.getPreviewBack())
                 .build();
     }
 }

@@ -127,6 +127,8 @@ public class OrderServiceImpl implements OrderService {
                     ? product.getImages().get(0)
                     : product.getImageUrl();
 
+            boolean customized = Boolean.TRUE.equals(itemRequest.getCustomized());
+
             OrderItem orderItem = OrderItem.builder()
                     .order(order)
                     .productId(product.getId())
@@ -135,6 +137,9 @@ public class OrderServiceImpl implements OrderService {
                     .size(sizeValue)
                     .quantity(itemRequest.getQuantity())
                     .price(product.getPrice())
+                    .customized(customized)
+                    .previewFront(itemRequest.getPreviewFront())
+                    .previewBack(itemRequest.getPreviewBack())
                     .build();
             order.getItems().add(orderItem);
         }

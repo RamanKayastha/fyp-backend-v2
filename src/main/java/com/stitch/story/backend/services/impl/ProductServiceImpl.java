@@ -77,6 +77,8 @@ public class ProductServiceImpl implements ProductService {
             product.getSizes().addAll(productDTO.getSizes());
         }
 
+        product.setCustomizable(productDTO.isCustomizable());
+
         Product savedProduct = productRepository.save(product);
         activityLogService.record(
                 ActivityAction.UPDATE,

@@ -50,4 +50,8 @@ public class Product {
     @CollectionTable(name = "product_sizes", joinColumns = @JoinColumn(name = "product_id"))
     @Column(name = "size")
     private List<Size> sizes = new ArrayList<>();
+
+    @Builder.Default
+    @Column(nullable = false)
+    private boolean customizable = false;
 }

@@ -7,4 +7,7 @@ public class OrderItemRequest {
     private Long productId;
     private String size;
     private Integer quantity;
+    private Boolean customized;
+    private String previewFront;
+    private String previewBack;
 }

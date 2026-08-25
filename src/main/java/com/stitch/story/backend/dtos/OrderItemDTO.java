@@ -18,4 +18,7 @@ public class OrderItemDTO {
     private String size;
     private Integer quantity;
     private BigDecimal price;
+    private boolean customized;
+    private String previewFront;
+    private String previewBack;
 }

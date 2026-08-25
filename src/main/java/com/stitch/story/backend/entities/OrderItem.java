@@ -32,4 +32,16 @@ public class OrderItem {
 
     @Column(nullable = false)
     private BigDecimal price;
+
+    @Builder.Default
+    @Column(nullable = false)
+    private boolean customized = false;
+
+    @Lob
+    @Column(name = "preview_front", columnDefinition = "LONGTEXT")
+    private String previewFront;
+
+    @Lob
+    @Column(name = "preview_back", columnDefinition = "LONGTEXT")
+    private String previewBack;
 }
