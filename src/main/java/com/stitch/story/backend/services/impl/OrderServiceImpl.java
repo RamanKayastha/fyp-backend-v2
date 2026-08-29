@@ -36,6 +36,9 @@ import java.util.List;
 public class OrderServiceImpl implements OrderService {
 
     private static final BigDecimal DELIVERY_FEE = BigDecimal.TEN;
+    private static final BigDecimal TEXT_LAYER_FEE = new BigDecimal("350");
+    private static final BigDecimal IMAGE_LAYER_FEE = new BigDecimal("500");
+    private static final BigDecimal GRAPHICS_LAYER_FEE = new BigDecimal("200");
 
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
@@ -120,14 +123,16 @@ public class OrderServiceImpl implements OrderService {
             product.setStock(stock - itemRequest.getQuantity());
             productRepository.save(product);
 
-            BigDecimal lineTotal = product.getPrice().multiply(BigDecimal.valueOf(itemRequest.getQuantity()));
+            boolean customized = Boolean.TRUE.equals(itemRequest.getCustomized());
+            BigDecimal unitPrice = customized
+                    ? customizedUnitPrice(product.getPrice(), itemRequest)
+                    : product.getPrice();
+            BigDecimal lineTotal = unitPrice.multiply(BigDecimal.valueOf(itemRequest.getQuantity()));
             subtotal = subtotal.add(lineTotal);
 
             String imageUrl = product.getImages() != null && !product.getImages().isEmpty()
                     ? product.getImages().get(0)
                     : product.getImageUrl();
-
-            boolean customized = Boolean.TRUE.equals(itemRequest.getCustomized());
 
             OrderItem orderItem = OrderItem.builder()
                     .order(order)
@@ -136,7 +141,7 @@ public class OrderServiceImpl implements OrderService {
                     .imageUrl(imageUrl)
                     .size(sizeValue)
                     .quantity(itemRequest.getQuantity())
-                    .price(product.getPrice())
+                    .price(unitPrice)
                     .customized(customized)
                     .previewFront(itemRequest.getPreviewFront())
                     .previewBack(itemRequest.getPreviewBack())
@@ -226,6 +231,17 @@ public class OrderServiceImpl implements OrderService {
         requireText(area, "Area is required");
         requireText(request.getLandmark(), "Street address / landmark is required");
         requireText(request.getPaymentMethod(), "Payment method is required");
+    }
+
+    private BigDecimal customizedUnitPrice(BigDecimal basePrice, OrderItemRequest itemRequest) {
+        return basePrice
+                .add(TEXT_LAYER_FEE.multiply(BigDecimal.valueOf(nonNegative(itemRequest.getTextCount()))))
+                .add(IMAGE_LAYER_FEE.multiply(BigDecimal.valueOf(nonNegative(itemRequest.getImageCount()))))
+                .add(GRAPHICS_LAYER_FEE.multiply(BigDecimal.valueOf(nonNegative(itemRequest.getGraphicsCount()))));
+    }
+
+    private int nonNegative(Integer value) {
+        return value == null || value < 0 ? 0 : value;
     }
 
     private String firstNonBlank(String primary, String fallback) {

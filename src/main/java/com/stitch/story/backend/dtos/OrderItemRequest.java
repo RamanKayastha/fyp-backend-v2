@@ -10,4 +10,7 @@ public class OrderItemRequest {
     private Boolean customized;
     private String previewFront;
     private String previewBack;
+    private Integer textCount;
+    private Integer imageCount;
+    private Integer graphicsCount;
 }
