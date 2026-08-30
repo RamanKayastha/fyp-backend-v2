@@ -47,18 +47,55 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     public OrderDTO createOrder(CreateOrderRequest request) {
+        PaymentMethod paymentMethod = parsePaymentMethod(request.getPaymentMethod());
+        if (paymentMethod != PaymentMethod.COD) {
+            throw new BadRequestException("Pay with eSewa first");
+        }
+        return persistOrder(request, paymentMethod);
+    }
+
+    @Override
+    public OrderDTO createVerifiedOnlineOrder(CreateOrderRequest request) {
+        PaymentMethod paymentMethod = parsePaymentMethod(request.getPaymentMethod());
+        if (paymentMethod != PaymentMethod.ESEWA) {
+            throw new BadRequestException("Invalid payment method");
+        }
+        return persistOrder(request, paymentMethod);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public BigDecimal quoteTotal(CreateOrderRequest request) {
+        User user = getCurrentUser();
+        validateDelivery(request);
+        if (request.getItems() == null || request.getItems().isEmpty()) {
+            throw new BadRequestException("Your cart is empty");
+        }
+        if (firstNonBlank(request.getEmail(), user.getEmail()) == null
+                || firstNonBlank(request.getEmail(), user.getEmail()).isBlank()) {
+            throw new BadRequestException("Email is required");
+        }
+        return quoteSubtotal(request).add(DELIVERY_FEE);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public OrderDTO getMyOrder(Long id) {
+        User user = getCurrentUser();
+        Order order = orderRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Order not found"));
+        if (order.getUser() == null || !order.getUser().getId().equals(user.getId())) {
+            throw new UnauthorizedException("Unauthorized");
+        }
+        return OrderMapper.toDTO(order);
+    }
+
+    private OrderDTO persistOrder(CreateOrderRequest request, PaymentMethod paymentMethod) {
         User user = getCurrentUser();
         validateDelivery(request);
 
         if (request.getItems() == null || request.getItems().isEmpty()) {
             throw new BadRequestException("Your cart is empty");
-        }
-
-        PaymentMethod paymentMethod;
-        try {
-            paymentMethod = PaymentMethod.valueOf(request.getPaymentMethod().trim().toUpperCase());
-        } catch (Exception exception) {
-            throw new BadRequestException("Invalid payment method");
         }
 
         String fullName = firstNonBlank(request.getFullName(), joinedName(request.getFirstName(), request.getLastName()));
@@ -153,6 +190,53 @@ public class OrderServiceImpl implements OrderService {
         order.setTotal(subtotal.add(DELIVERY_FEE));
 
         return OrderMapper.toDTO(orderRepository.save(order));
+    }
+
+    private BigDecimal quoteSubtotal(CreateOrderRequest request) {
+        BigDecimal subtotal = BigDecimal.ZERO;
+        for (OrderItemRequest itemRequest : request.getItems()) {
+            if (itemRequest.getProductId() == null || itemRequest.getQuantity() == null || itemRequest.getQuantity() < 1) {
+                throw new BadRequestException("Each item needs a product and quantity");
+            }
+            if (itemRequest.getSize() == null || itemRequest.getSize().isBlank()) {
+                throw new BadRequestException("Please select a size for every item");
+            }
+
+            Product product = productRepository.findById(itemRequest.getProductId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Product not found"));
+
+            int stock = product.getStock() == null ? 0 : product.getStock();
+            if (stock < itemRequest.getQuantity()) {
+                throw new BadRequestException(product.getName() + " does not have enough stock");
+            }
+
+            String sizeValue = itemRequest.getSize().trim().toUpperCase();
+            if (product.getSizes() != null && !product.getSizes().isEmpty()) {
+                boolean sizeAllowed = product.getSizes().stream()
+                        .anyMatch(size -> size.name().equals(sizeValue));
+                if (!sizeAllowed) {
+                    throw new BadRequestException(product.getName() + " is not available in size " + sizeValue);
+                }
+            }
+
+            boolean customized = Boolean.TRUE.equals(itemRequest.getCustomized());
+            BigDecimal unitPrice = customized
+                    ? customizedUnitPrice(product.getPrice(), itemRequest)
+                    : product.getPrice();
+            subtotal = subtotal.add(unitPrice.multiply(BigDecimal.valueOf(itemRequest.getQuantity())));
+        }
+        return subtotal;
+    }
+
+    private PaymentMethod parsePaymentMethod(String value) {
+        if (value == null || value.isBlank()) {
+            throw new BadRequestException("Payment method is required");
+        }
+        try {
+            return PaymentMethod.valueOf(value.trim().toUpperCase());
+        } catch (Exception exception) {
+            throw new BadRequestException("Invalid payment method");
+        }
     }
 
     @Override

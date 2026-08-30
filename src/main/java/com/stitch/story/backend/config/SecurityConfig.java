@@ -51,6 +51,20 @@ public class SecurityConfig {
                         .anyRequest()
                         .authenticated()
                 )
+                .exceptionHandling(exceptions -> exceptions
+                        .defaultAuthenticationEntryPointFor(
+                                (request, response, authException) -> {
+                                    response.setStatus(401);
+                                    response.setContentType("application/json");
+                                    response.setCharacterEncoding("UTF-8");
+                                    response.getWriter().write("{\"message\":\"Unauthorized\"}");
+                                },
+                                request -> {
+                                    String path = request.getRequestURI();
+                                    return path != null && path.startsWith("/api/");
+                                }
+                        )
+                )
                 .oauth2Login(oauth -> oauth
                         .userInfoEndpoint(user ->
                                 user.userService(oauthService)
