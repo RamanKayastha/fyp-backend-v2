@@ -35,7 +35,8 @@ import java.util.List;
 @Transactional
 public class OrderServiceImpl implements OrderService {
 
-    private static final BigDecimal DELIVERY_FEE = BigDecimal.TEN;
+    private static final BigDecimal DELIVERY_FEE = new BigDecimal("100");
+    private static final BigDecimal COD_FEE = new BigDecimal("50");
     private static final BigDecimal TEXT_LAYER_FEE = new BigDecimal("350");
     private static final BigDecimal IMAGE_LAYER_FEE = new BigDecimal("500");
     private static final BigDecimal GRAPHICS_LAYER_FEE = new BigDecimal("200");
@@ -124,7 +125,7 @@ public class OrderServiceImpl implements OrderService {
                 .phone(request.getPhone().trim())
                 .paymentMethod(paymentMethod)
                 .status(OrderStatus.PENDING)
-                .deliveryFee(DELIVERY_FEE)
+                .deliveryFee(orderFees(paymentMethod))
                 .build();
         if (order.getItems() == null) {
             order.setItems(new java.util.ArrayList<>());
@@ -187,7 +188,7 @@ public class OrderServiceImpl implements OrderService {
         }
 
         order.setSubtotal(subtotal);
-        order.setTotal(subtotal.add(DELIVERY_FEE));
+        order.setTotal(subtotal.add(orderFees(paymentMethod)));
 
         return OrderMapper.toDTO(orderRepository.save(order));
     }
@@ -288,6 +289,10 @@ public class OrderServiceImpl implements OrderService {
                 "Updated order #" + saved.getId() + " from " + previousStatus + " to " + nextStatus
         );
         return OrderMapper.toDTO(saved);
+    }
+
+    private BigDecimal orderFees(PaymentMethod paymentMethod) {
+        return paymentMethod == PaymentMethod.COD ? DELIVERY_FEE.add(COD_FEE) : DELIVERY_FEE;
     }
 
     private void restoreStock(Order order) {
