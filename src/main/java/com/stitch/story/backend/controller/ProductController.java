@@ -22,6 +22,11 @@ public class ProductController {
         return new ResponseEntity<>(savedProduct, HttpStatus.CREATED);
     }
 
+    @GetMapping("/mine")
+    public ResponseEntity<List<ProductDTO>> getMyProducts() {
+        return new ResponseEntity<>(productService.getMyProducts(), HttpStatus.OK);
+    }
+
     @GetMapping("{id}")
     public ResponseEntity<ProductDTO> getProductByID(@PathVariable Long id) {
         ProductDTO product = productService.getProductByID(id);

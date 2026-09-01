@@ -61,7 +61,7 @@ public class SecurityConfig {
                                 },
                                 request -> {
                                     String path = request.getRequestURI();
-                                    return path != null && path.startsWith("/api/");
+                                    return path != null && (path.startsWith("/api/") || path.equals("/error"));
                                 }
                         )
                 )

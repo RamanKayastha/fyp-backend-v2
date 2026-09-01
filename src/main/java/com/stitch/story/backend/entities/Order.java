@@ -57,6 +57,13 @@ public class Order {
     @Column(nullable = false)
     private BigDecimal total;
 
+    private String checkoutGroupId;
+    private String shopName;
+
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "vendor_id")
+    private User vendor;
+
     private LocalDateTime createdAt;
 
     @Builder.Default

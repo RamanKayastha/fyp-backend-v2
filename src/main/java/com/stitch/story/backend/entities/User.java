@@ -29,7 +29,10 @@ public class User {
 
     private String address;
 
+    private String shopName;
+
     @Enumerated(EnumType.STRING)
+    @Column(length = 32)
     private Role role;
 
     @Enumerated(EnumType.STRING)

@@ -24,9 +24,11 @@ public class ActivityLog {
     private String actorEmail;
 
     @Enumerated(EnumType.STRING)
+    @Column(length = 32)
     private ActivityAction action;
 
     @Enumerated(EnumType.STRING)
+    @Column(length = 32)
     private ActivityEntityType entityType;
 
     private Long entityId;

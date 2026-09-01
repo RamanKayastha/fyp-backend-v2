@@ -31,4 +31,6 @@ public class ProductDTO {
     @JsonProperty("customizable")
     @JsonAlias({ "isCustomizable" })
     private boolean customizable;
+    private Long vendorId;
+    private String shopName;
 }

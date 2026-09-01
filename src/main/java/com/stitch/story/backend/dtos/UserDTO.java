@@ -20,6 +20,7 @@ public class UserDTO {
     private String password;
     private String contact;
     private String address;
+    private String shopName;
     private Role role;
     private AuthProvider authProvider;
 }

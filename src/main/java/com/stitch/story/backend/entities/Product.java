@@ -54,4 +54,8 @@ public class Product {
     @Builder.Default
     @Column(nullable = false)
     private boolean customizable = false;
+
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "vendor_id")
+    private User vendor;
 }

@@ -14,6 +14,7 @@ public class UserMapper {
                 user.getPassword(),
                 user.getContact(),
                 user.getAddress(),
+                user.getShopName(),
                 user.getRole(),
                 user.getAuthProvider()
         );
@@ -28,6 +29,7 @@ public class UserMapper {
                 userDTO.getPassword(),
                 userDTO.getContact(),
                 userDTO.getAddress(),
+                userDTO.getShopName(),
                 userDTO.getRole(),
                 userDTO.getAuthProvider()
         );

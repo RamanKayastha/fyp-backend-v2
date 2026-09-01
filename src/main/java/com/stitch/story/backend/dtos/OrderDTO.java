@@ -36,6 +36,9 @@ public class OrderDTO {
     private BigDecimal deliveryFee;
     private BigDecimal total;
     private Integer itemCount;
+    private Long vendorId;
+    private String shopName;
+    private String checkoutGroupId;
     private LocalDateTime createdAt;
     private List<OrderItemDTO> items;
 }

@@ -6,7 +6,7 @@ import com.stitch.story.backend.dtos.OrderDTO;
 import java.math.BigDecimal;
 import java.util.List;
 
-public interface OrderService {
+public interface    OrderService {
     OrderDTO createOrder(CreateOrderRequest request);
 
     OrderDTO createVerifiedOnlineOrder(CreateOrderRequest request);

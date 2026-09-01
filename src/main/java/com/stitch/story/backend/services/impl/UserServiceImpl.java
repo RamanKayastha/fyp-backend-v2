@@ -52,6 +52,9 @@ public class UserServiceImpl implements UserService {
         user.setPassword(passwordEncoder.encode(userDTO.getPassword()));
         user.setRole(userDTO.getRole() != null ? userDTO.getRole() : Role.USER);
         user.setAuthProvider(AuthProvider.LOCAL);
+        if (user.getRole() == Role.VENDOR && (user.getShopName() == null || user.getShopName().isBlank())) {
+            user.setShopName(user.getUsername());
+        }
 
         User saved = userRepository.save(user);
         activityLogService.record(
@@ -98,6 +101,9 @@ public class UserServiceImpl implements UserService {
                 throw new BadRequestException("You cannot remove your own admin role");
             }
             user.setRole(userDTO.getRole());
+            if (userDTO.getRole() == Role.VENDOR && (user.getShopName() == null || user.getShopName().isBlank())) {
+                user.setShopName(user.getUsername());
+            }
         }
 
         User saved = userRepository.save(user);

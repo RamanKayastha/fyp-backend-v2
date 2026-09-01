@@ -11,37 +11,44 @@ import com.stitch.story.backend.repositories.ActivityLogRepository;
 import com.stitch.story.backend.repositories.UserRepository;
 import com.stitch.story.backend.services.ActivityLogService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
-@Transactional
 public class ActivityLogServiceImpl implements ActivityLogService {
 
     private final ActivityLogRepository activityLogRepository;
     private final UserRepository userRepository;
 
     @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void record(ActivityAction action, ActivityEntityType entityType, Long entityId, String description) {
-        User actor = currentAdminOrNull();
-        if (actor == null) {
-            return;
-        }
+        try {
+            User actor = currentAdminOrNull();
+            if (actor == null) {
+                return;
+            }
 
-        activityLogRepository.save(ActivityLog.builder()
-                .actorId(actor.getId())
-                .actorName(actor.getUsername())
-                .actorEmail(actor.getEmail())
-                .action(action)
-                .entityType(entityType)
-                .entityId(entityId)
-                .description(description)
-                .build());
+            activityLogRepository.save(ActivityLog.builder()
+                    .actorId(actor.getId())
+                    .actorName(actor.getUsername())
+                    .actorEmail(actor.getEmail())
+                    .action(action)
+                    .entityType(entityType)
+                    .entityId(entityId)
+                    .description(description)
+                    .build());
+        } catch (Exception exception) {
+            log.warn("Could not write activity log: {}", exception.getMessage());
+        }
     }
 
     @Override

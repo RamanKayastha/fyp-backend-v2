@@ -4,6 +4,7 @@ import com.stitch.story.backend.dtos.OrderDTO;
 import com.stitch.story.backend.dtos.OrderItemDTO;
 import com.stitch.story.backend.entities.Order;
 import com.stitch.story.backend.entities.OrderItem;
+import com.stitch.story.backend.util.ShopNames;
 
 import java.util.List;
 
@@ -49,6 +50,9 @@ public class OrderMapper {
                 .deliveryFee(order.getDeliveryFee())
                 .total(order.getTotal())
                 .itemCount(itemCount)
+                .vendorId(order.getVendor() != null ? order.getVendor().getId() : null)
+                .shopName(order.getShopName() != null ? order.getShopName() : ShopNames.of(order.getVendor()))
+                .checkoutGroupId(order.getCheckoutGroupId())
                 .createdAt(order.getCreatedAt())
                 .items(items)
                 .build();

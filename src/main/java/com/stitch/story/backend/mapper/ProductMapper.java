@@ -2,6 +2,7 @@ package com.stitch.story.backend.mapper;
 
 import com.stitch.story.backend.dtos.ProductDTO;
 import com.stitch.story.backend.entities.Product;
+import com.stitch.story.backend.util.ShopNames;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -20,6 +21,8 @@ public class ProductMapper {
                 .category(product.getCategory())
                 .sizes(product.getSizes() != null ? product.getSizes() : List.of())
                 .customizable(product.isCustomizable())
+                .vendorId(product.getVendor() != null ? product.getVendor().getId() : null)
+                .shopName(ShopNames.of(product.getVendor()))
                 .build();
     }
 

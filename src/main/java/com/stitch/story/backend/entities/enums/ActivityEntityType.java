@@ -4,5 +4,6 @@ public enum ActivityEntityType {
     PRODUCT,
     USER,
     ORDER,
-    PROFILE
+    PROFILE,
+    VENDOR
 }
