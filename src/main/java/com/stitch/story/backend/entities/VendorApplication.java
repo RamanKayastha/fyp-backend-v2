@@ -32,6 +32,10 @@ public class VendorApplication {
     private String idDocument;
     private String payoutAccount;
 
+    private String proofStoredName;
+    private String proofOriginalName;
+    private String proofContentType;
+
     @Column(length = 2000)
     private String note;
 

@@ -1,5 +1,6 @@
 package com.stitch.story.backend.dtos;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -21,6 +22,10 @@ public class VendorApplicationDTO {
     private String address;
     private String idDocument;
     private String payoutAccount;
+    private String proofDocumentName;
+
+    @JsonProperty("proofUploaded")
+    private boolean proofUploaded;
     private String note;
     private String status;
     private String adminNote;

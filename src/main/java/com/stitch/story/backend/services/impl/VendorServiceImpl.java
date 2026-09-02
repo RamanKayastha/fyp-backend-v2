@@ -15,12 +15,14 @@ import com.stitch.story.backend.exceptions.UnauthorizedException;
 import com.stitch.story.backend.repositories.UserRepository;
 import com.stitch.story.backend.repositories.VendorApplicationRepository;
 import com.stitch.story.backend.services.ActivityLogService;
+import com.stitch.story.backend.services.VendorProofStorage;
 import com.stitch.story.backend.services.VendorService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -33,9 +35,10 @@ public class VendorServiceImpl implements VendorService {
     private final VendorApplicationRepository vendorApplicationRepository;
     private final UserRepository userRepository;
     private final ActivityLogService activityLogService;
+    private final VendorProofStorage vendorProofStorage;
 
     @Override
-    public VendorApplicationDTO apply(VendorApplyRequest request) {
+    public VendorApplicationDTO apply(VendorApplyRequest request, MultipartFile proof) {
         User user = getCurrentUser();
         if (user.getRole() == Role.ADMIN) {
             throw new BadRequestException("Admins cannot apply as vendors");
@@ -53,6 +56,8 @@ public class VendorServiceImpl implements VendorService {
         requireText(request.getIdDocument(), "ID / PAN number is required");
         requireText(request.getPayoutAccount(), "Payout account is required");
 
+        VendorProofStorage.StoredProof storedProof = vendorProofStorage.store(proof);
+
         VendorApplication saved = vendorApplicationRepository.save(VendorApplication.builder()
                 .user(user)
                 .shopName(request.getShopName().trim())
@@ -60,6 +65,9 @@ public class VendorServiceImpl implements VendorService {
                 .address(request.getAddress().trim())
                 .idDocument(request.getIdDocument().trim())
                 .payoutAccount(request.getPayoutAccount().trim())
+                .proofStoredName(storedProof.storedName())
+                .proofOriginalName(storedProof.originalName())
+                .proofContentType(storedProof.contentType())
                 .note(blankToNull(request.getNote()))
                 .status(VendorApplicationStatus.PENDING)
                 .build());
@@ -138,6 +146,26 @@ public class VendorServiceImpl implements VendorService {
         return toDTO(saved);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public ProofDocument loadProofDocument(Long id) {
+        VendorApplication application = vendorApplicationRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Application not found"));
+        User current = getCurrentUser();
+        boolean owner = application.getUser() != null && application.getUser().getId().equals(current.getId());
+        if (current.getRole() != Role.ADMIN && !owner) {
+            throw new UnauthorizedException("Admin access required");
+        }
+        if (application.getProofStoredName() == null || application.getProofStoredName().isBlank()) {
+            throw new ResourceNotFoundException("Document not found");
+        }
+        return new ProofDocument(
+                vendorProofStorage.load(application.getProofStoredName()),
+                application.getProofOriginalName() == null ? "document" : application.getProofOriginalName(),
+                application.getProofContentType()
+        );
+    }
+
     private VendorApplicationDTO toDTO(VendorApplication application) {
         User user = application.getUser();
         return VendorApplicationDTO.builder()
@@ -150,6 +178,8 @@ public class VendorServiceImpl implements VendorService {
                 .address(application.getAddress())
                 .idDocument(application.getIdDocument())
                 .payoutAccount(application.getPayoutAccount())
+                .proofDocumentName(application.getProofOriginalName())
+                .proofUploaded(application.getProofStoredName() != null && !application.getProofStoredName().isBlank())
                 .note(application.getNote())
                 .status(application.getStatus() != null ? application.getStatus().name() : null)
                 .adminNote(application.getAdminNote())

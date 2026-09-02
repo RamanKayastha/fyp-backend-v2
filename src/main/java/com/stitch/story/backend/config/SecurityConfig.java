@@ -109,6 +109,9 @@ public class SecurityConfig {
         configuration.setAllowedHeaders(
                 List.of("*")
         );
+        configuration.setExposedHeaders(
+                List.of("Content-Disposition", "Content-Type")
+        );
 
         UrlBasedCorsConfigurationSource source =
                 new UrlBasedCorsConfigurationSource();
