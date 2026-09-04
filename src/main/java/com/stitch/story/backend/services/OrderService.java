@@ -2,8 +2,10 @@ package com.stitch.story.backend.services;
 
 import com.stitch.story.backend.dtos.CreateOrderRequest;
 import com.stitch.story.backend.dtos.OrderDTO;
+import com.stitch.story.backend.dtos.SalesSummaryDTO;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 
 public interface    OrderService {
@@ -18,6 +20,8 @@ public interface    OrderService {
     List<OrderDTO> getMyOrders();
 
     List<OrderDTO> getAllOrders();
+
+    SalesSummaryDTO getSales(String period, LocalDate from, LocalDate to, Long vendorId);
 
     OrderDTO updateStatus(Long id, String status);
 }

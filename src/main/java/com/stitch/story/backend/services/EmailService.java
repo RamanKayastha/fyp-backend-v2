@@ -40,6 +40,14 @@ public class EmailService {
         mailSender.send(message);
     }
 
+    public void sendOrderCancelled(String to, Order order, String cancelledBy) {
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setTo(to);
+        message.setSubject("Order #" + order.getId() + " has been cancelled");
+        message.setText(cancelledBody(order, cancelledBy));
+        mailSender.send(message);
+    }
+
     private String outForDeliveryBody(Order order) {
         String shop = order.getShopName() == null || order.getShopName().isBlank()
                 ? "Stitch & Story"
@@ -73,6 +81,32 @@ public class EmailService {
                 + (order.getPhone() == null || order.getPhone().isBlank() ? "" : "Phone: " + order.getPhone() + "\n")
                 + "\nTotal: Rs. " + order.getTotal() + "\n\n"
                 + "You can also check this order in My Orders.";
+    }
+
+    private String cancelledBody(Order order, String cancelledBy) {
+        String shop = order.getShopName() == null || order.getShopName().isBlank()
+                ? "Stitch & Story"
+                : order.getShopName();
+        String name = firstNonBlank(order.getFullName(), joinedName(order.getFirstName(), order.getLastName()));
+
+        StringBuilder items = new StringBuilder();
+        if (order.getItems() != null) {
+            for (OrderItem item : order.getItems()) {
+                items.append("- ")
+                        .append(item.getProductName() == null ? "Item" : item.getProductName());
+                if (item.getSize() != null && !item.getSize().isBlank()) {
+                    items.append(" (").append(item.getSize()).append(")");
+                }
+                items.append(" x ").append(item.getQuantity() == null ? 1 : item.getQuantity())
+                        .append("\n");
+            }
+        }
+
+        return "Order #" + order.getId() + " from " + shop + " has been cancelled by " + cancelledBy + ".\n\n"
+                + "Items:\n" + items
+                + (name == null ? "" : "\nCustomer: " + name + "\n")
+                + "Total: Rs. " + order.getTotal() + "\n\n"
+                + "This order will not be fulfilled. If payment was made online, contact Stitch & Story about a refund.";
     }
 
     private static String firstNonBlank(String... values) {

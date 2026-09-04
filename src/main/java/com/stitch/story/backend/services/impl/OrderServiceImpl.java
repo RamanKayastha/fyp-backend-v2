@@ -3,6 +3,10 @@ package com.stitch.story.backend.services.impl;
 import com.stitch.story.backend.dtos.CreateOrderRequest;
 import com.stitch.story.backend.dtos.OrderDTO;
 import com.stitch.story.backend.dtos.OrderItemRequest;
+import com.stitch.story.backend.dtos.ProductSalesDTO;
+import com.stitch.story.backend.dtos.SalesPointDTO;
+import com.stitch.story.backend.dtos.SalesSummaryDTO;
+import com.stitch.story.backend.dtos.VendorCommissionDTO;
 import com.stitch.story.backend.entities.Order;
 import com.stitch.story.backend.entities.OrderItem;
 import com.stitch.story.backend.entities.Product;
@@ -31,10 +35,18 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @Slf4j
@@ -48,6 +60,7 @@ public class OrderServiceImpl implements OrderService {
     private static final BigDecimal TEXT_LAYER_FEE = new BigDecimal("350");
     private static final BigDecimal IMAGE_LAYER_FEE = new BigDecimal("500");
     private static final BigDecimal GRAPHICS_LAYER_FEE = new BigDecimal("200");
+    private static final BigDecimal COMMISSION_RATE = new BigDecimal("0.10");
 
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
@@ -193,6 +206,8 @@ public class OrderServiceImpl implements OrderService {
                     .city(request.getCity().trim())
                     .area(area.trim())
                     .landmark(request.getLandmark().trim())
+                    .latitude(request.getLatitude())
+                    .longitude(request.getLongitude())
                     .address(area.trim())
                     .zipCode(blankToNull(request.getZipCode()))
                     .country(firstNonBlank(request.getCountry(), "Nepal").trim())
@@ -332,10 +347,220 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public SalesSummaryDTO getSales(String period, LocalDate from, LocalDate to, Long vendorId) {
+        User actor = getCurrentUser();
+        List<Order> source;
+        if (actor.getRole() == Role.VENDOR) {
+            source = orderRepository.findByVendorOrderByCreatedAtDesc(actor);
+        } else if (actor.getRole() == Role.ADMIN) {
+            if (vendorId != null) {
+                User vendor = userRepository.findById(vendorId)
+                        .orElseThrow(() -> new ResourceNotFoundException("Vendor not found"));
+                source = orderRepository.findByVendorOrderByCreatedAtDesc(vendor);
+            } else {
+                source = orderRepository.findAllByOrderByCreatedAtDesc();
+            }
+        } else {
+            throw new UnauthorizedException("Vendor or admin access required");
+        }
+
+        ZoneId zone = ZoneId.of("Asia/Kathmandu");
+        LocalDate today = LocalDate.now(zone);
+        String range = period == null ? "week" : period.trim().toLowerCase();
+        LocalDate start;
+        LocalDate end;
+        if (from != null && to != null) {
+            if (to.isBefore(from)) {
+                throw new BadRequestException("End date cannot be before start date");
+            }
+            start = from;
+            end = to;
+            range = "custom";
+        } else if ("day".equals(range) || "today".equals(range)) {
+            start = today;
+            end = today;
+            range = "day";
+        } else if ("month".equals(range)) {
+            start = today.with(TemporalAdjusters.firstDayOfMonth());
+            end = today;
+        } else {
+            start = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+            end = today;
+            range = "week";
+        }
+
+        List<Order> counted = source.stream()
+                .filter(order -> order.getStatus() != OrderStatus.CANCELLED)
+                .filter(order -> {
+                    if (order.getCreatedAt() == null) {
+                        return false;
+                    }
+                    LocalDate placed = order.getCreatedAt().atZone(zone).toLocalDate();
+                    return !placed.isBefore(start) && !placed.isAfter(end);
+                })
+                .toList();
+
+        Map<LocalDate, SalesBucket> days = new LinkedHashMap<>();
+        for (LocalDate cursor = start; !cursor.isAfter(end); cursor = cursor.plusDays(1)) {
+            days.put(cursor, new SalesBucket());
+        }
+
+        Map<String, ProductBucket> products = new LinkedHashMap<>();
+        Map<Long, VendorBucket> vendors = new LinkedHashMap<>();
+        BigDecimal revenue = BigDecimal.ZERO;
+        BigDecimal vendorRevenue = BigDecimal.ZERO;
+        BigDecimal deliveryFees = BigDecimal.ZERO;
+        long unitsSold = 0;
+
+        for (Order order : counted) {
+            LocalDate placed = order.getCreatedAt().atZone(zone).toLocalDate();
+            SalesBucket day = days.get(placed);
+            if (day == null) {
+                continue;
+            }
+            day.orderCount++;
+            BigDecimal orderItems = BigDecimal.ZERO;
+            long orderUnits = 0;
+            if (order.getItems() != null) {
+                for (OrderItem item : order.getItems()) {
+                    int quantity = item.getQuantity() == null ? 0 : item.getQuantity();
+                    BigDecimal line = (item.getPrice() == null ? BigDecimal.ZERO : item.getPrice())
+                            .multiply(BigDecimal.valueOf(quantity));
+                    orderItems = orderItems.add(line);
+                    orderUnits += quantity;
+                    String key = (item.getProductId() == null ? "none" : item.getProductId().toString())
+                            + "|" + (item.getProductName() == null ? "Item" : item.getProductName());
+                    ProductBucket product = products.computeIfAbsent(key, ignored -> new ProductBucket(
+                            item.getProductId(),
+                            item.getProductName() == null || item.getProductName().isBlank() ? "Item" : item.getProductName()
+                    ));
+                    product.units += quantity;
+                    product.revenue = product.revenue.add(line);
+                    product.orders.add(order.getId());
+                }
+            }
+            day.revenue = day.revenue.add(orderItems);
+            day.units += orderUnits;
+            revenue = revenue.add(orderItems);
+            unitsSold += orderUnits;
+            if (order.getDeliveryFee() != null) {
+                deliveryFees = deliveryFees.add(order.getDeliveryFee());
+            }
+            if (order.getVendor() != null) {
+                vendorRevenue = vendorRevenue.add(orderItems);
+                Long id = order.getVendor().getId();
+                VendorBucket vendor = vendors.computeIfAbsent(id, ignored -> new VendorBucket(
+                        id,
+                        ShopNames.of(order.getVendor())
+                ));
+                vendor.revenue = vendor.revenue.add(orderItems);
+                vendor.units += orderUnits;
+                vendor.orders.add(order.getId());
+            }
+        }
+
+        DateTimeFormatter labelFormat = DateTimeFormatter.ofPattern("EEE d MMM");
+        List<SalesPointDTO> dailySales = days.entrySet().stream()
+                .map(entry -> SalesPointDTO.builder()
+                        .date(entry.getKey())
+                        .label(entry.getKey().format(labelFormat))
+                        .revenue(entry.getValue().revenue)
+                        .orderCount(entry.getValue().orderCount)
+                        .unitsSold(entry.getValue().units)
+                        .build())
+                .toList();
+
+        List<ProductSalesDTO> productSales = products.values().stream()
+                .sorted((left, right) -> right.revenue.compareTo(left.revenue))
+                .map(product -> ProductSalesDTO.builder()
+                        .productId(product.productId)
+                        .productName(product.productName)
+                        .unitsSold(product.units)
+                        .revenue(product.revenue)
+                        .orderCount(product.orders.size())
+                        .build())
+                .toList();
+
+        List<VendorCommissionDTO> vendorCommissions = vendors.values().stream()
+                .sorted((left, right) -> right.revenue.compareTo(left.revenue))
+                .map(vendor -> {
+                    BigDecimal commission = percent(vendor.revenue);
+                    return VendorCommissionDTO.builder()
+                            .vendorId(vendor.vendorId)
+                            .shopName(vendor.shopName)
+                            .revenue(vendor.revenue)
+                            .commission(commission)
+                            .vendorPayout(vendor.revenue.subtract(commission))
+                            .orderCount(vendor.orders.size())
+                            .unitsSold(vendor.units)
+                            .build();
+                })
+                .toList();
+
+        BigDecimal commission = percent(vendorRevenue);
+
+        return SalesSummaryDTO.builder()
+                .period(range)
+                .from(start)
+                .to(end)
+                .revenue(revenue)
+                .deliveryFees(deliveryFees)
+                .commissionRate(COMMISSION_RATE)
+                .vendorRevenue(vendorRevenue)
+                .commission(commission)
+                .vendorPayout(vendorRevenue.subtract(commission))
+                .orderCount(counted.size())
+                .unitsSold(unitsSold)
+                .dailySales(dailySales)
+                .productSales(productSales)
+                .vendorCommissions(vendorCommissions)
+                .build();
+    }
+
+    private static BigDecimal percent(BigDecimal amount) {
+        return (amount == null ? BigDecimal.ZERO : amount)
+                .multiply(COMMISSION_RATE)
+                .setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private static class SalesBucket {
+        private BigDecimal revenue = BigDecimal.ZERO;
+        private long orderCount;
+        private long units;
+    }
+
+    private static class ProductBucket {
+        private final Long productId;
+        private final String productName;
+        private BigDecimal revenue = BigDecimal.ZERO;
+        private long units;
+        private final java.util.Set<Long> orders = new java.util.HashSet<>();
+
+        private ProductBucket(Long productId, String productName) {
+            this.productId = productId;
+            this.productName = productName;
+        }
+    }
+
+    private static class VendorBucket {
+        private final Long vendorId;
+        private final String shopName;
+        private BigDecimal revenue = BigDecimal.ZERO;
+        private long units;
+        private final java.util.Set<Long> orders = new java.util.HashSet<>();
+
+        private VendorBucket(Long vendorId, String shopName) {
+            this.vendorId = vendorId;
+            this.shopName = shopName;
+        }
+    }
+
+    @Override
     public OrderDTO updateStatus(Long id, String statusValue) {
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found"));
-        requireCanManageOrder(order);
+        User actor = getCurrentUser();
 
         OrderStatus nextStatus;
         try {
@@ -343,6 +568,8 @@ public class OrderServiceImpl implements OrderService {
         } catch (Exception exception) {
             throw new BadRequestException("Invalid order status");
         }
+
+        requireCanManageOrder(order, actor, nextStatus);
 
         OrderStatus currentStatus = order.getStatus() == null ? OrderStatus.PENDING : order.getStatus();
         if (!currentStatus.canTransitionTo(nextStatus)) {
@@ -368,6 +595,9 @@ public class OrderServiceImpl implements OrderService {
         if (nextStatus == OrderStatus.OUT_FOR_DELIVERY) {
             notifyOutForDelivery(saved);
         }
+        if (nextStatus == OrderStatus.CANCELLED) {
+            notifyCancelled(saved, actor);
+        }
         return OrderMapper.toDTO(saved);
     }
 
@@ -381,6 +611,46 @@ public class OrderServiceImpl implements OrderService {
             emailService.sendOutForDelivery(to.trim(), order);
         } catch (Exception exception) {
             log.warn("Could not send out-for-delivery email for order #{}: {}", order.getId(), exception.getMessage());
+        }
+    }
+
+    private void notifyCancelled(Order order, User actor) {
+        String cancelledBy = cancelledByLabel(actor);
+        for (String to : cancellationRecipients(order)) {
+            try {
+                emailService.sendOrderCancelled(to, order, cancelledBy);
+            } catch (Exception exception) {
+                log.warn("Could not send cancellation email for order #{} to {}: {}",
+                        order.getId(), to, exception.getMessage());
+            }
+        }
+    }
+
+    private String cancelledByLabel(User actor) {
+        if (actor.getRole() == Role.ADMIN) {
+            return "an admin";
+        }
+        if (actor.getRole() == Role.VENDOR) {
+            return "the seller";
+        }
+        return "the customer";
+    }
+
+    private Set<String> cancellationRecipients(Order order) {
+        Set<String> recipients = new LinkedHashSet<>();
+        addEmail(recipients, firstNonBlank(order.getEmail(), order.getUser() != null ? order.getUser().getEmail() : null));
+        if (order.getVendor() != null) {
+            addEmail(recipients, order.getVendor().getEmail());
+        }
+        for (User admin : userRepository.findByRole(Role.ADMIN)) {
+            addEmail(recipients, admin.getEmail());
+        }
+        return recipients;
+    }
+
+    private void addEmail(Set<String> recipients, String email) {
+        if (email != null && !email.isBlank()) {
+            recipients.add(email.trim());
         }
     }
 
@@ -413,6 +683,9 @@ public class OrderServiceImpl implements OrderService {
         requireText(area, "Area is required");
         requireText(request.getLandmark(), "Street address / landmark is required");
         requireText(request.getPaymentMethod(), "Payment method is required");
+        if (request.getLatitude() == null || request.getLongitude() == null) {
+            throw new BadRequestException("Mark your delivery location on the map");
+        }
     }
 
     private BigDecimal customizedUnitPrice(BigDecimal basePrice, OrderItemRequest itemRequest) {
@@ -456,14 +729,18 @@ public class OrderServiceImpl implements OrderService {
         return value == null || value.isBlank() ? null : value.trim();
     }
 
-    private void requireCanManageOrder(Order order) {
-        User actor = getCurrentUser();
+    private void requireCanManageOrder(Order order, User actor, OrderStatus nextStatus) {
         if (actor.getRole() == Role.ADMIN) {
             return;
         }
         if (actor.getRole() == Role.VENDOR
                 && order.getVendor() != null
                 && order.getVendor().getId().equals(actor.getId())) {
+            return;
+        }
+        if (nextStatus == OrderStatus.CANCELLED
+                && order.getUser() != null
+                && order.getUser().getId().equals(actor.getId())) {
             return;
         }
         throw new UnauthorizedException("You can only update your own orders");

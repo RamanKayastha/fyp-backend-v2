@@ -21,7 +21,18 @@ public class SchemaPatchConfig {
             widen("activity_logs", "entity_type");
             widen("activity_logs", "action");
             widen("vendor_application", "status");
+            addDoubleColumn("orders", "latitude");
+            addDoubleColumn("orders", "longitude");
         };
+    }
+
+    private void addDoubleColumn(String table, String column) {
+        try {
+            jdbcTemplate.execute("ALTER TABLE " + table + " ADD COLUMN " + column + " DOUBLE NULL");
+            log.info("Ensured {}.{} exists", table, column);
+        } catch (Exception exception) {
+            log.warn("Could not add {}.{}: {}", table, column, exception.getMessage());
+        }
     }
 
     private void widen(String table, String column) {

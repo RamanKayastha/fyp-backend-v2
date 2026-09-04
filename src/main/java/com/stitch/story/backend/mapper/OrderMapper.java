@@ -41,6 +41,8 @@ public class OrderMapper {
                 .region(order.getRegion())
                 .area(order.getArea())
                 .landmark(order.getLandmark())
+                .latitude(order.getLatitude())
+                .longitude(order.getLongitude())
                 .zipCode(order.getZipCode())
                 .country(order.getCountry())
                 .phone(order.getPhone())

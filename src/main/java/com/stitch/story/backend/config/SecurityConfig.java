@@ -44,7 +44,7 @@ public class SecurityConfig {
                         )
                 )
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/auth/**")
+                        .requestMatchers("/auth/**", "/error")
                         .permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/products", "/api/products/*")
                         .permitAll()
@@ -61,7 +61,7 @@ public class SecurityConfig {
                                 },
                                 request -> {
                                     String path = request.getRequestURI();
-                                    return path != null && (path.startsWith("/api/") || path.equals("/error"));
+                                    return path != null && path.startsWith("/api/");
                                 }
                         )
                 )

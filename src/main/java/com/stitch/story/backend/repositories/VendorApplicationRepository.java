@@ -14,4 +14,6 @@ public interface VendorApplicationRepository extends JpaRepository<VendorApplica
     boolean existsByUserAndStatus(User user, VendorApplicationStatus status);
 
     List<VendorApplication> findAllByOrderByCreatedAtDesc();
+
+    List<VendorApplication> findByUser(User user);
 }

@@ -27,6 +27,8 @@ public class OrderDTO {
     private String region;
     private String area;
     private String landmark;
+    private Double latitude;
+    private Double longitude;
     private String zipCode;
     private String country;
     private String phone;

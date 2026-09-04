@@ -14,6 +14,8 @@ public class CreateOrderRequest {
     private String city;
     private String area;
     private String landmark;
+    private Double latitude;
+    private Double longitude;
     private String address;
     private String state;
     private String zipCode;

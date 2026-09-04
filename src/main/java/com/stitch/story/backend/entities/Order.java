@@ -17,7 +17,7 @@ import java.util.List;
 @Builder
 @Entity
 @Table(name = "orders")
-public class Order {
+public class ~Order {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -38,6 +38,8 @@ public class Order {
 
     @Column(length = 500)
     private String landmark;
+    private Double latitude;
+    private Double longitude;
     private String zipCode;
     private String country;
     private String phone;

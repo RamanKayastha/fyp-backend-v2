@@ -10,7 +10,11 @@ import com.stitch.story.backend.exceptions.BadRequestException;
 import com.stitch.story.backend.exceptions.ResourceNotFoundException;
 import com.stitch.story.backend.exceptions.UnauthorizedException;
 import com.stitch.story.backend.mapper.UserMapper;
+import com.stitch.story.backend.repositories.OrderRepository;
+import com.stitch.story.backend.repositories.PendingPaymentRepository;
+import com.stitch.story.backend.repositories.ProductRepository;
 import com.stitch.story.backend.repositories.UserRepository;
+import com.stitch.story.backend.repositories.VendorApplicationRepository;
 import com.stitch.story.backend.services.ActivityLogService;
 import com.stitch.story.backend.services.UserService;
 import lombok.AllArgsConstructor;
@@ -31,6 +35,10 @@ public class UserServiceImpl implements UserService {
     private UserRepository userRepository;
     private PasswordEncoder passwordEncoder;
     private ActivityLogService activityLogService;
+    private VendorApplicationRepository vendorApplicationRepository;
+    private PendingPaymentRepository pendingPaymentRepository;
+    private ProductRepository productRepository;
+    private OrderRepository orderRepository;
 
     @Override
     public UserDTO createUser(UserDTO userDTO) {
@@ -129,7 +137,14 @@ public class UserServiceImpl implements UserService {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         String email = user.getEmail();
+
+        vendorApplicationRepository.deleteAll(vendorApplicationRepository.findByUser(user));
+        pendingPaymentRepository.deleteAll(pendingPaymentRepository.findByUser(user));
+        productRepository.clearVendor(user);
+        orderRepository.clearVendor(user);
+        orderRepository.deleteAll(orderRepository.findByUserOrderByCreatedAtDesc(user));
         userRepository.delete(user);
+
         activityLogService.record(
                 ActivityAction.DELETE,
                 ActivityEntityType.USER,
