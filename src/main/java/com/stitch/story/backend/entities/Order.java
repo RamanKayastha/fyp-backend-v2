@@ -2,6 +2,7 @@ package com.stitch.story.backend.entities;
 
 import com.stitch.story.backend.entities.enums.OrderStatus;
 import com.stitch.story.backend.entities.enums.PaymentMethod;
+import com.stitch.story.backend.entities.enums.RefundStatus;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -58,6 +59,13 @@ public class Order {
 
     @Column(nullable = false)
     private BigDecimal total;
+
+    private Integer refundPercent;
+    private BigDecimal refundAmount;
+
+    @Enumerated(EnumType.STRING)
+    @Column(length = 32)
+    private RefundStatus refundStatus;
 
     private String checkoutGroupId;
     private String shopName;

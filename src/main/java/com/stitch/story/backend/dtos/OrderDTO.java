@@ -37,6 +37,9 @@ public class OrderDTO {
     private BigDecimal subtotal;
     private BigDecimal deliveryFee;
     private BigDecimal total;
+    private Integer refundPercent;
+    private BigDecimal refundAmount;
+    private String refundStatus;
     private Integer itemCount;
     private Long vendorId;
     private String shopName;

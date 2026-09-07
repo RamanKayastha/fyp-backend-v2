@@ -52,4 +52,9 @@ public class OrderController {
     ) {
         return ResponseEntity.ok(orderService.updateStatus(id, request.getStatus()));
     }
+
+    @PutMapping("/{id}/refund")
+    public ResponseEntity<OrderDTO> markRefunded(@PathVariable Long id) {
+        return ResponseEntity.ok(orderService.markRefunded(id));
+    }
 }

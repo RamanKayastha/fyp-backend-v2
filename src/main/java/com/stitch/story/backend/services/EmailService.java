@@ -105,8 +105,17 @@ public class EmailService {
         return "Order #" + order.getId() + " from " + shop + " has been cancelled by " + cancelledBy + ".\n\n"
                 + "Items:\n" + items
                 + (name == null ? "" : "\nCustomer: " + name + "\n")
-                + "Total: Rs. " + order.getTotal() + "\n\n"
-                + "This order will not be fulfilled. If payment was made online, contact Stitch & Story about a refund.";
+                + "Total: Rs. " + order.getTotal() + "\n"
+                + refundLine(order)
+                + "\nThis order will not be fulfilled.";
+    }
+
+    private String refundLine(Order order) {
+        if (order.getRefundAmount() == null || order.getRefundPercent() == null) {
+            return "";
+        }
+        return "eSewa refund due: Rs. " + order.getRefundAmount()
+                + " (" + order.getRefundPercent() + "%). An admin will process this refund.\n";
     }
 
     private static String firstNonBlank(String... values) {

@@ -23,12 +23,42 @@ public class SchemaPatchConfig {
             widen("vendor_application", "status");
             addDoubleColumn("orders", "latitude");
             addDoubleColumn("orders", "longitude");
+            addIntegerColumn("orders", "refund_percent");
+            addDecimalColumn("orders", "refund_amount");
+            addVarcharColumn("orders", "refund_status", 32);
         };
     }
 
     private void addDoubleColumn(String table, String column) {
         try {
             jdbcTemplate.execute("ALTER TABLE " + table + " ADD COLUMN " + column + " DOUBLE NULL");
+            log.info("Ensured {}.{} exists", table, column);
+        } catch (Exception exception) {
+            log.warn("Could not add {}.{}: {}", table, column, exception.getMessage());
+        }
+    }
+
+    private void addIntegerColumn(String table, String column) {
+        try {
+            jdbcTemplate.execute("ALTER TABLE " + table + " ADD COLUMN " + column + " INT NULL");
+            log.info("Ensured {}.{} exists", table, column);
+        } catch (Exception exception) {
+            log.warn("Could not add {}.{}: {}", table, column, exception.getMessage());
+        }
+    }
+
+    private void addDecimalColumn(String table, String column) {
+        try {
+            jdbcTemplate.execute("ALTER TABLE " + table + " ADD COLUMN " + column + " DECIMAL(19,2) NULL");
+            log.info("Ensured {}.{} exists", table, column);
+        } catch (Exception exception) {
+            log.warn("Could not add {}.{}: {}", table, column, exception.getMessage());
+        }
+    }
+
+    private void addVarcharColumn(String table, String column, int length) {
+        try {
+            jdbcTemplate.execute("ALTER TABLE " + table + " ADD COLUMN " + column + " VARCHAR(" + length + ") NULL");
             log.info("Ensured {}.{} exists", table, column);
         } catch (Exception exception) {
             log.warn("Could not add {}.{}: {}", table, column, exception.getMessage());

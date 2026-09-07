@@ -15,6 +15,7 @@ import com.stitch.story.backend.entities.enums.ActivityAction;
 import com.stitch.story.backend.entities.enums.ActivityEntityType;
 import com.stitch.story.backend.entities.enums.OrderStatus;
 import com.stitch.story.backend.entities.enums.PaymentMethod;
+import com.stitch.story.backend.entities.enums.RefundStatus;
 import com.stitch.story.backend.entities.enums.Role;
 import com.stitch.story.backend.exceptions.BadRequestException;
 import com.stitch.story.backend.exceptions.ResourceNotFoundException;
@@ -573,6 +574,9 @@ public class OrderServiceImpl implements OrderService {
 
         OrderStatus currentStatus = order.getStatus() == null ? OrderStatus.PENDING : order.getStatus();
         if (!currentStatus.canTransitionTo(nextStatus)) {
+            if (nextStatus == OrderStatus.CANCELLED && !currentStatus.canCancel()) {
+                throw new BadRequestException("Orders cannot be cancelled once out for delivery");
+            }
             throw new BadRequestException("Order status can only move one step forward");
         }
         if (currentStatus == nextStatus) {
@@ -580,6 +584,7 @@ public class OrderServiceImpl implements OrderService {
         }
 
         if (currentStatus != OrderStatus.CANCELLED && nextStatus == OrderStatus.CANCELLED) {
+            applyCancellationRefund(order, currentStatus);
             restoreStock(order);
         }
 
@@ -599,6 +604,55 @@ public class OrderServiceImpl implements OrderService {
             notifyCancelled(saved, actor);
         }
         return OrderMapper.toDTO(saved);
+    }
+
+    @Override
+    public OrderDTO markRefunded(Long id) {
+        Order order = orderRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Order not found"));
+        User actor = getCurrentUser();
+        if (actor.getRole() != Role.ADMIN) {
+            throw new UnauthorizedException("Only admin can mark a refund as completed");
+        }
+        if (order.getStatus() != OrderStatus.CANCELLED) {
+            throw new BadRequestException("Only cancelled orders can be refunded");
+        }
+        if (order.getPaymentMethod() != PaymentMethod.ESEWA) {
+            throw new BadRequestException("Only eSewa payments support online refunds");
+        }
+        if (order.getRefundStatus() != RefundStatus.PENDING) {
+            throw new BadRequestException("No pending refund for this order");
+        }
+
+        order.setRefundStatus(RefundStatus.COMPLETED);
+        Order saved = orderRepository.save(order);
+        activityLogService.record(
+                ActivityAction.UPDATE,
+                ActivityEntityType.ORDER,
+                saved.getId(),
+                "Marked refund completed for order #" + saved.getId()
+                        + " (Rs. " + saved.getRefundAmount() + ")"
+        );
+        return OrderMapper.toDTO(saved);
+    }
+
+    private void applyCancellationRefund(Order order, OrderStatus cancelledFrom) {
+        if (order.getPaymentMethod() != PaymentMethod.ESEWA) {
+            order.setRefundPercent(null);
+            order.setRefundAmount(null);
+            order.setRefundStatus(RefundStatus.NONE);
+            return;
+        }
+
+        int percent = cancelledFrom == OrderStatus.PENDING ? 100 : 70;
+        BigDecimal total = order.getTotal() == null ? BigDecimal.ZERO : order.getTotal();
+        BigDecimal amount = total
+                .multiply(BigDecimal.valueOf(percent))
+                .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+
+        order.setRefundPercent(percent);
+        order.setRefundAmount(amount);
+        order.setRefundStatus(RefundStatus.PENDING);
     }
 
     private void notifyOutForDelivery(Order order) {

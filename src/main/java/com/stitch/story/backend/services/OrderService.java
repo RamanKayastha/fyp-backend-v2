@@ -24,4 +24,6 @@ public interface    OrderService {
     SalesSummaryDTO getSales(String period, LocalDate from, LocalDate to, Long vendorId);
 
     OrderDTO updateStatus(Long id, String status);
+
+    OrderDTO markRefunded(Long id);
 }

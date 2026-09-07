@@ -26,10 +26,15 @@ public enum OrderStatus {
             return false;
         }
         if (next == CANCELLED) {
-            return true;
+            return canCancel();
         }
         int from = FLOW.indexOf(this);
         int to = FLOW.indexOf(next);
         return from >= 0 && to == from + 1;
+    }
+
+    /** Cancel allowed until packing / ready to ship. Blocked once out for delivery. */
+    public boolean canCancel() {
+        return this == PENDING || this == PACKING || this == READY_TO_SHIP;
     }
 }
